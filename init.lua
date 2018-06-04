@@ -1,4 +1,5 @@
-package.cpath = "./?.so"
+--package.cpath = "./?.dll"
+
 require("test")
 
 local function test()

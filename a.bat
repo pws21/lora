@@ -1,0 +1,2 @@
+cl /nologo /c /I"d:\distr\lua64\include"  /I"../odpi/include" /O2 /DWIN32 /D_CRT_SECURE_NO_DEPRECATE .\test.c
+link /nologo /dll /def:test.def  /OUT:test.dll "d:\distr\lua64\lua52.lib" ../odpi/lib/odpic.lib test.obj

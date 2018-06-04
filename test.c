@@ -3,11 +3,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "lua.h"
-#include "lauxlib.h"
+#include "lauxlib.h" 
 
 static dpiContext *gContext = NULL;
 
-int showError(void)
+int showError(void) 
 {
     dpiErrorInfo info;
 
@@ -63,7 +63,6 @@ dpiConn *getConn(dpiCommonCreateParams *commonParams)
 int test_dpi()
 {
   dpiConn *conn;
-  conn = getConn(NULL);
   dpiStmt *stmt;
   char sql[] = "select user from dual";
   uint32_t numCol; 
@@ -71,6 +70,8 @@ int test_dpi()
   uint32_t bufferRowIndex;
   dpiData *data;
   dpiNativeTypeNum nativeTypeNum;
+
+  conn = getConn(NULL);
 
   if (dpiConn_prepareStmt(conn, 0, sql, strlen(sql), NULL, 0, &stmt)) {
     return showError();
