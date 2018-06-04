@@ -7,3 +7,5 @@ local function test()
 end
 
 print(cube(3))
+
+print(dpi())

@@ -17,6 +17,37 @@ int showError(void)
     return -1;
 }
 
+static int save_pushstring_wrapped(struct lua_State *L)
+{
+	char *str = (char *)lua_topointer(L, 1);
+	lua_pushstring(L, str);
+	return 1;
+}
+
+static int safe_pushstring(struct lua_State *L, char *str)
+{
+	lua_pushcfunction(L, save_pushstring_wrapped);
+	lua_pushlightuserdata(L, str);
+	return lua_pcall(L, 1, 1, 0);
+}
+
+static int lua_push_error(struct lua_State *L)
+{
+	lua_pushnumber(L, -3);
+	lua_insert(L, -2);
+	return 2;
+}
+
+static int lua_odpi_push_error(struct lua_State *L)
+{
+    dpiErrorInfo info;
+    dpiContext_getError(gContext, &info);
+    fprintf(stderr, "ERROR: %.*s (%s: %s)\n", info.messageLength, info.message, info.fnName, info.action);
+	lua_pushnumber(L, -1);
+	safe_pushstring(L, info.message);
+	return 2;
+}
+
 static void fatalError(const char *message)
 {
     fprintf(stderr, "FATAL: %s\n", message);
@@ -46,12 +77,12 @@ static void getParams(void)
 
 
 
-dpiConn *getConn(dpiCommonCreateParams *commonParams) 
+dpiConn *getConn(char *username, char *password, char *dbname) 
 {
+    dpiCommonCreateParams *commonParams = NULL;
   dpiConn *conn;
-  //dpiPool *pool;
   getParams();
-  if (dpiConn_create(gContext, "onm", 3, "onm",3, "onyma11", 7, commonParams, NULL, &conn) < 0) {
+  if (dpiConn_create(gContext, username, strlen(username), password,strlen(password), dbname, strlen(dbname), commonParams, NULL, &conn) < 0) {
     showError();
     fatalError("Unable to create connect");
   }
@@ -60,7 +91,7 @@ dpiConn *getConn(dpiCommonCreateParams *commonParams)
 
 
 
-int test_dpi()
+int test_dpi(lua_State *L)
 {
   dpiConn *conn;
   dpiStmt *stmt;
@@ -68,24 +99,47 @@ int test_dpi()
   uint32_t numCol; 
   int found;
   uint32_t bufferRowIndex;
-  dpiData *data;
+  dpiData *outputValue;
+  dpiVar *outputVar;
   dpiNativeTypeNum nativeTypeNum;
 
-  conn = getConn(NULL);
+  conn = getConn("onm", "onm", "onyma11");
 
   if (dpiConn_prepareStmt(conn, 0, sql, strlen(sql), NULL, 0, &stmt)) {
-    return showError();
+    return lua_odpi_push_error(L);
   }
+  //if (dpiConn_newVar(conn, DPI_ORACLE_TYPE_VARCHAR, DPI_NATIVE_TYPE_BYTES, 1, 0, 0, 0, NULL, &outputVar, &outputValue) < 0)
+  //      return lua_odpi_push_error(L);
+
   if (dpiStmt_execute(stmt, 0, &numCol) < 0) {
-    return showError();
+    return lua_odpi_push_error(L);
   }
+  //if (dpiStmt_define(stmt, 1, outputVar) < 0)
+  //    return lua_odpi_push_error(L);
   if (dpiStmt_fetch(stmt, &found, &bufferRowIndex) < 0 ) {
-      return showError();
+      return lua_odpi_push_error(L);
   }
-  dpiStmt_getQueryValue(stmt, 3, &nativeTypeNum, &data);
+  if (dpiStmt_getQueryValue(stmt, 1, &nativeTypeNum, &outputValue) < 0) {
+      return lua_odpi_push_error(L);
+  }
+
+  lua_pushlstring(L, outputValue->value.asBytes.ptr, outputValue->value.asBytes.length);
+  
   dpiStmt_release(stmt);
-  fprintf(stderr, "QQQ %s", "qqq");
-  return 0;
+  dpiConn_release(conn);
+  //fprintf(stderr, "QQQ %s", "qqq");
+  return 1;
+}
+
+static int lua_ora_connect(lua_State *L) {
+	const char *user = lua_tostring(L, 1);
+	const char *pass = lua_tostring(L, 2);
+	const char *db = lua_tostring(L, 3);
+    dpiConn *conn = getConn(user, pass, db);
+    dpiConn **conn_p = (dpiConn **)lua_newuserdata(L, sizeof(dpiConn *));
+	*conn_p = conn;
+	//luaL_getmetatable(L, mysql_driver_label);
+	lua_setmetatable(L, -2);
 }
 
 
@@ -97,8 +151,10 @@ static int icube(lua_State *L){
 	return 1;                              
 }
 
+
 LUA_API int luaopen_test (lua_State *L) {
 	lua_register(L,"cube",icube);
+    lua_register(L,"dpi",test_dpi);
 
 	return 0;
 }
