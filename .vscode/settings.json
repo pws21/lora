@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "dpi.h": "c"
+        "dpi.h": "c",
+        "lua.h": "c"
     }
 }
